@@ -1,4 +1,11 @@
+const fs = require('fs')
 const { defineConfig } = require('@vue/cli-service')
 module.exports = defineConfig({
-  transpileDependencies: true
+  transpileDependencies: true,
+  devServer: {
+    https: true
+  },
+  configureWebpack: {
+    devtool: 'source-map'
+  }
 })

@@ -1,15 +1,14 @@
 <template>
-  <img alt="Vue logo" src="./assets/logo.png">
-  <HelloWorld msg="Welcome to Your Vue.js App"/>
+    <GraphViewer websocket-url="wss://192.168.2.134:8765" />
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import GraphViewer from './components/GraphViewer.vue'
 
 export default {
   name: 'App',
   components: {
-    HelloWorld
+    GraphViewer
   }
 }
 </script>
@@ -21,6 +20,20 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  margin-top: 60px;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  overflow: auto;
+}
+body, html {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: auto;
+}
+canvas {
+  left: 0;
 }
 </style>
