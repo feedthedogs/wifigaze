@@ -1,5 +1,5 @@
 <template>
-    <GraphViewer websocket-url="wss://192.168.2.134:8765" />
+    <GraphViewer websocket-url="ws://192.168.2.134:8765/ws" />
 </template>
 
 <script>

@@ -1,10 +1,12 @@
 import asyncio
 import subprocess
-import websockets
-import ssl
+from quart import Quart, websocket, send_from_directory
+import asyncio
+import os
 
-# WebSocket server port
-websocket_port = 8765
+
+# WebServer_port server port
+webserver_port = 8765
 
 # Define channels to monitor for 2.4 GHz and 5 GHz
 #channels_24ghz = [1, 6, 11]
@@ -21,36 +23,10 @@ hopping_interval = 0.2  # Time (in seconds) between channel changes
 #    "wlan1": channels_24ghz,
 #    "wlan2": channels_5ghz,
 #}
-interfaces = ["wlan1", "wlan2"]
+interfaces = ["wlan1", "wlan2"] # 
 
 # Dictionary to hold tshark processes
 tshark_processes = {}
-
-global_websocket = None
-# WebSocket clients
-websocket_clients = set()
-
-async def websocket_server(websocket):
-    """Handle WebSocket connections."""
-    global websocket_clients
-    global global_websocket
-    global_websocket = websocket
-    websocket_clients.add(websocket)
-    try:
-        await websocket.wait_closed()
-    finally:
-        websocket_clients.remove(websocket)
-
-async def broadcast(data):
-    """Send data to all connected WebSocket clients."""
-    #if websocket_clients:
-    #    await asyncio.wait([client.send(data) for client in websocket_clients])
-    if global_websocket and len(websocket_clients) > 0:
-        try:
-            await global_websocket.send(data)
-        except Exception as e:
-            print(e)
-
 
 async def start_tshark(interface):
     """Start a tshark process to capture packets on an interface."""
@@ -142,17 +118,54 @@ async def hop_channels():
         if loop_count > 1000000: loop_count = 0
         await asyncio.sleep(hopping_interval)
 
-# WebSocket server setup
-async def start_websocket_server():
-    """Start the WebSocket server."""
+# Create Quart app
+app = Quart(__name__, static_folder='frontend/dist')
+
+@app.route('/<path:path>')
+async def serve_static_files(path):
+    """
+    Serve static files like JavaScript, CSS, and assets from Vue.js build folder.
+    """
+    file_path = os.path.join(app.static_folder, path)
+    if os.path.exists(file_path):
+        return await send_from_directory(app.static_folder, path)
+    return "File not found", 404
+
+# WebSocket connections storage
+connected_clients = set()
+
+# WebSocket endpoint
+@app.websocket('/ws')
+async def ws():
+    # Add client to the connected_clients set
+    connected_clients.add(websocket._get_current_object())
     try:
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)  # Might need to use ssl.PROTOCOL_TLS for older versions of Python
-        context.load_cert_chain(certfile='cert.pem', keyfile='key.pem', password='123456')
-        print(f"Starting WebSocket server on port {websocket_port}...")
-        async with websockets.serve(websocket_server, "0.0.0.0", websocket_port, ssl=context) as server:
-            await server.wait_closed()
-    except Exception as e:
-        print(f"WebSocket server failed to start: {e}")
+        while True:
+            # Receive data from the client
+            data = await websocket.receive()
+            print(f"Received: {data}")
+    except asyncio.CancelledError:
+        pass
+    finally:
+        # Remove client from the set when they disconnect
+        connected_clients.remove(websocket._get_current_object())
+        print("Client disconnected")
+
+async def broadcast(data):
+    # Broadcast the data to all connected clients
+    for client in connected_clients:
+        await client.send(data)
+
+# Function for running Hypercorn
+async def run_quart():
+    from hypercorn.asyncio import serve
+    from hypercorn.config import Config
+
+    config = Config()
+    config.bind = [f"0.0.0.0:{webserver_port}"]
+
+    # Run the Hypercorn server
+    await serve(app, config)
 
 def evenly_distributed_selection(arr, count, loop_count):
     """Select `count` evenly distributed items from `arr` for the current `loop_count`."""
@@ -167,23 +180,17 @@ async def run_tasks():
         tasks.append(asyncio.create_task(start_tshark(interface)))
 
     # Start channel hopping in a separate thread
-    #threading.Thread(target=hop_channels, daemon=True).start()
     tasks.append(asyncio.create_task(hop_channels()))
 
     # Start the WebSocket server
-    tasks.append(asyncio.create_task(start_websocket_server()))
+    tasks.append(asyncio.create_task(run_quart()))
     await asyncio.gather(*tasks)
     print("here?")
 
 def main():
     """Main function to start tshark and channel hopping."""
     try:
-        #loop = asyncio.get_event_loop()
-        
         asyncio.run(run_tasks())
-
-        #loop.run_until_complete()
-        #loop.close()
 
     except KeyboardInterrupt:
         print("Stopping...")
