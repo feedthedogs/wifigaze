@@ -169,7 +169,12 @@ async def hop_channels(interfaces, channels, channel_dwell_time):
         await asyncio.sleep(channel_dwell_time)
 
 # Create Quart app
-app = Quart(__name__, static_folder='dist')
+app = Quart(__name__, static_folder='static')
+
+@app.route('/')
+async def serve_index():
+    logger.info(f"webserver: 404 not found: {app.static_folder} index.html")
+    return await send_from_directory(app.static_folder, "index.html")
 
 @app.route('/<path:path>')
 async def serve_static_files(path):

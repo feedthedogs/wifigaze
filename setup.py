@@ -1,22 +1,23 @@
 import os
 import subprocess
+import shutil
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
 class CustomBuild(build_py):
     def run(self):
         # Build Vue.js frontend
-        subprocess.check_call(["npm", "install"], cwd="frontend")
-        subprocess.check_call(["npm", "run", "build"], cwd="frontend")
+        # subprocess.check_call(["npm", "install"], cwd="frontend")
+        subprocess.check_call(["npm", "run", "buildDev"], cwd="frontend") # replace buildDev with build
         # Copy build output to the static folder
         os.makedirs("wifigaze/static", exist_ok=True)
         for item in os.listdir("frontend/dist"):
             source = os.path.join("frontend/dist", item)
             dest = os.path.join("wifigaze/static", item)
             if os.path.isdir(source):
-                subprocess.check_call(["cp", "-r", source, dest])
+                shutil.copytree(source, dest, dirs_exist_ok=True)
             else:
-                subprocess.check_call(["cp", source, dest])
+                shutil.copy(source, dest)
         super().run()
 
 setup(

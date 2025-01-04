@@ -1,22 +1,47 @@
 <template>
-  <div id="container" ref="container" class="graph-container">
-  </div>
-  <div id="counter">Nodes: 0</div>
-  <div id="legend">
-    <LegendTable :ssids="ssids" :ssidColours="ssidColours" />
-  </div>
-  <div id="infopanel">
-    <AttributesTable :attributes="attributes" />
-    <SearchComponent :updateSearch="updateSearch" />
-    <NodeList :filteredNodes="filteredNodes" @highlightNode="highlightNode" />
-    <div id="export-panel">
-      <button @click="downloadFile(graph)">Export Graph</button>
+  <div v-if="isLandscape" class="app-container" :style="gridStyle"
+      @mousemove="onMouseMove"
+      @mouseup="onMouseUp"
+      @mouseleave="onMouseUp"
+      @touchmove="onTouchMove"
+      @touchend="onTouchEnd">
+
+    <!-- Legend Panel -->
+    <div class="panel legend-panel">
+      <LegendTable :ssids="ssids" :ssidColours="ssidColours" />
+      <div
+          class="resizer resizer-left"
+          @mousedown="startResize('left', $event)"
+          @touchstart="startResize('left', $event)"
+        ></div>
+    </div>
+
+    <main id="container" ref="container" class="graph-container">
+    </main>
+
+    <div id="counter">Nodes: 0</div>
+
+    <div class="panel properties-panel">
+      <AttributesTable :attributes="attributes" />
+      <SearchComponent :updateSearch="updateSearch" />
+      <NodeList :filteredNodes="filteredNodes" @highlightNode="highlightNode" />
+      <div id="export-panel">
+        <button @click="downloadFile(graph)">Export Graph</button>
+      </div>
+      <div
+          class="resizer resizer-right"
+          @mousedown="startResize('right', $event)"
+          @touchstart="startResize('right', $event)"
+        ></div>
     </div>
   </div>
+  <div v-else class="rotate-message">
+      <p>Width too small, please turn your device sideways and refresh.</p>
+    </div>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, onBeforeUnmount, computed } from "vue";
 import Sigma from "sigma";
 import Graph from "graphology";
 
@@ -51,8 +76,15 @@ export default {
     let socket = null;
     const infopanel = ref(null);
     let ssids = ref({});
-    //let ssidColours = ref(null);
     let theme = 'light'
+
+    const isLandscape = ref(window.innerWidth > 414);
+    const showLeftPanel = ref(true);
+    const showRightPanel = ref(true);
+    const leftPanelWidth = ref(200); // Initial width in pixels
+    const rightPanelWidth = ref(350); // Initial width in pixels
+    const resizing = ref(null); // Track which panel is being resized  
+    const startX = ref(0); // Track the starting x-coordinate for touch/mouse  
 
     function initializeGraph() {
       if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -69,8 +101,9 @@ export default {
           enableEdgeHovering: true,
           minEdgeSize: 2,
           nodeReducer: nodeReducer,
-          edgeReducer: edgeReducer
-        }
+          edgeReducer: edgeReducer,
+          allowInvalidContainer: true
+        },
       );
       // Handle node click events
       sigmaInstance.on("clickNode", ({ node }) => {
@@ -105,6 +138,56 @@ export default {
 
       applyTheme(theme);
     }
+
+    const gridStyle = computed(() => {
+      return `
+        grid-template-columns: ${showLeftPanel.value ? `${leftPanelWidth.value}px` : "0"} 1fr ${
+        showRightPanel.value ? `${rightPanelWidth.value}px` : "0"
+      };
+      `;
+    });
+
+    const handleResize = () => {
+      isLandscape.value = window.innerWidth > 414;
+    };
+
+    const startResize = (panel, event) => {
+      resizing.value = panel;
+      startX.value = event.touches ? event.touches[0].clientX : event.clientX;
+      event.preventDefault();
+    };
+
+    const onMouseMove = (event) => {
+      if (!resizing.value) return;
+
+      const delta = event.clientX - startX.value;
+      if (resizing.value === "left") {
+        leftPanelWidth.value = Math.max(150, leftPanelWidth.value + delta);
+      } else if (resizing.value === "right") {
+        rightPanelWidth.value = Math.max(150, rightPanelWidth.value - delta);
+      }
+      startX.value = event.clientX;
+    };
+
+    const onTouchMove = (event) => {
+      if (!resizing.value) return;
+
+      const delta = event.touches[0].clientX - startX.value;
+      if (resizing.value === "left") {
+        leftPanelWidth.value = Math.max(150, leftPanelWidth.value + delta);
+      } else if (resizing.value === "right") {
+        rightPanelWidth.value = Math.max(150, rightPanelWidth.value - delta);
+      }
+      startX.value = event.touches[0].clientX;
+    };
+
+    const onMouseUp = () => {
+      resizing.value = null;
+    };
+
+    const onTouchEnd = () => {
+      resizing.value = null;
+    };
 
     const updateSearch = (searchTerm) => {
       const term = searchTerm.toLowerCase();
@@ -193,7 +276,13 @@ export default {
       socket.onerror = (error) => {
         console.error("WebSocket error:", error);
       };
+
+      window.addEventListener("resize", handleResize);
     });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener("resize", handleResize);
+    });    
 
     onUnmounted(() => {
       if (socket) socket.close();
@@ -251,32 +340,120 @@ export default {
       sigmaInstance.refresh();
     }
 
-    return { container, infopanel, downloadFile, attributes, ssids, ssidColours, filteredNodes, updateSearch, highlightNode };
+    return { container, 
+      infopanel, 
+      downloadFile, 
+      attributes, 
+      ssids, 
+      ssidColours, 
+      filteredNodes, 
+      updateSearch, 
+      highlightNode, 
+      leftPanelWidth,
+      rightPanelWidth,
+      isLandscape,
+      gridStyle,
+      startResize,
+      onMouseMove,
+      onMouseUp,
+      onTouchMove,
+      onTouchEnd, };
   },
 };
 </script>
 
 <style>
-  .graph-container {
-    width: 70%;
-    height: 100vh;
-    border-right: 1px solid #ccc;
-    float: left;
-  }
-  #legend {
-    position: absolute;
-    left: 5px;
-    top: 5px;
-    padding: 10px;
-    background-color: #f8f8f8;
-    border-left: 1px solid #ccc;
+  /* Root Layout */
+  .app-container {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 200px 1fr 200px; /* Default sizes */
+    gap: 1rem;
     height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Panels */
+  .panel {
+    padding: 1rem;
+    background-color: #f4f4f4;
+    border: 1px solid #ddd;
+    overflow-y: auto;
+  }
+
+  /* Resizer Handles */
+  .resizer {
+    width: 5px;
+    cursor: ew-resize;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+  }
+
+  .resizer-left {
+    right: -2.5px;
+    background-color: #ccc;
+  }
+
+  .resizer-right {
+    left: -2.5px;
+    background-color: #ccc;
   }  
-  #infopanel {
-    width: 28%;
+
+  /* Panels */
+  .properties-panel {
+    background: #f4f4f4;
     padding: 10px;
-    float: left;
-  }  
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .legend-panel {
+    position: relative;
+  }
+
+  .properties-panel {
+    position: relative;
+  }
+
+  .graph-container {
+    overflow: hidden;
+  }
+
+  /* Buttons */
+  .toggle-btn {
+    position: absolute;
+    z-index: 10;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+  }
+  .toggle-btn.left {
+    top: 1rem;
+    left: 1rem;
+  }
+  .toggle-btn.right {
+    top: 1rem;
+    right: 1rem;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .legend-panel,
+    .properties-panel {
+      display: none;
+    }
+    .graph-container {
+      grid-column: 1 / -1;
+    }
+    .resizer {
+      width: 10px;
+    }
+  }
+
   #counter {
     position: absolute;
     top: 10px;
