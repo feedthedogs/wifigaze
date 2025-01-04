@@ -2,13 +2,18 @@
 WLAN Channel Hopper and Server Setup.
 
 Usage:
-  server.py --interfaces=<interfaces> [--channels=<channels>...] [--channel-dwell-time=<seconds>] [--listen-ip=<ip>] [--listen-port=<port>] [--log-level=<level>]
-  server.py (-h | --help)
+  wifigaze --interfaces=<interfaces> [--channels=<channels>...] [--channel-dwell-time=<seconds>] [--preload-graph=<path to json>] [--listen-ip=<ip>] [--listen-port=<port>] [--log-level=<level>]
+  wifigaze (-h | --help)
+
+Examples:
+  wifigaze --interfaces=wlan0
+  wifigaze --interfaces=wlan1 --channels=1,6,11  (if you have an 802.11bg interface)
 
 Options:
-  --interfaces=<interfaces>...       List of WLAN interfaces to use (e.g. wlan0,wlan1).
-  --channels=<channels>...           List of channels to scan [default: 1 6 11 36 40 44 48 149 153 157 161].
+  --interfaces=<interfaces>          List of WLAN interfaces to use (e.g. wlan0,wlan1).
+  --channels=<channels>              List of channels to scan [default: 1,6,11,36,40,44,48,149,153,157,161].
   --channel-dwell-time=<seconds>     Time interface should listen on channel before moving to the next [default: 1]
+  --preload-graph=<path to json>     Preload graph that was previously exported [default: None]
   --listen-ip=<ip>                   IP address to listen on [default: 127.0.0.1].
   --listen-port=<port>               Port to listen on [default: 8765].
   --log-level=<level>                Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL) [default: INFO].
@@ -108,6 +113,12 @@ async def start_tshark(interface):
             await broadcast(decoded_line)  # Send parsed data to WebSocket clients
         if process.stderr:
             logger.error(f"tshark: {process.stderr}")
+    except FileNotFoundError:
+        logger.error("Tshark is not installed or not in the system PATH.")
+        return False
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Tshark exists but there was an error executing it: {e}")
+        return False
     finally:
         process.terminate()
         try:
@@ -146,12 +157,15 @@ async def hop_channels(interfaces, channels, channel_dwell_time):
             #)
             command = ["sudo", "iwconfig", interfaces[index], "channel", str(channel)]
             await run_command_with_signal_handling(command)
-            #await process.wait()
-            #if process.stderr is not None:
-            #    logger.error(f"channels: {process.stderr}")  
+
+        # if we have same number of channels per interfaces we don't need to rotate, so exit
+        if len(interfaces) == len(channels):
+            logger.trace(f"channels: quitting due to having the same number of channels as interfaces, no need to rotate")
+            break
+
         loop_count += 1
         if loop_count > 1000000: loop_count = 0
-        #logger.trace(f"channels: sleeping")
+
         await asyncio.sleep(channel_dwell_time)
 
 # Create Quart app
@@ -222,6 +236,10 @@ async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_
 
 def evenly_distributed_selection(arr, count, loop_count):
     """Select `count` evenly distributed items from `arr` for the current `loop_count`."""
+    if not arr or count <= 1 or len(arr) == 1:
+        return [arr[loop_count % len(arr)]]
+    
+    # Regular case
     step = len(arr) // count
     indices = [(i + loop_count) % len(arr) for i in range(0, len(arr), step)][:count]
     return [arr[i] for i in indices]
@@ -273,11 +291,17 @@ async def main(arguments):
 
     # Parse arguments
     interfaces = arguments["--interfaces"].split(',')
-    channels = [int(ch) for ch in arguments["--channels"]]
+    channels = list(map(int, arguments["--channels"][0].split(',')))
     channel_dwell_time = int(arguments["--channel-dwell-time"])
+    graph_json = arguments["--preload-graph"]
     listen_ip = arguments["--listen-ip"]
     listen_port = int(arguments["--listen-port"])
     log_level = arguments["--log-level"].upper()
+
+    if type(interfaces) != list:
+        interfaces = [interfaces]
+    if type(channels) != list:
+        channels = [channels]
 
     logger.remove(0)
     logger.add(sys.stdout, level=log_level)
@@ -286,6 +310,7 @@ async def main(arguments):
     logger.info(f"WLAN Interfaces: {interfaces}")
     logger.info(f"Channels: {channels}")
     logger.info(f"Channel dwell time: {channel_dwell_time}s")
+    logger.info(f"Preload graph: {graph_json}")
     logger.info(f"Listen IP: {listen_ip}")
     logger.info(f"Listen Port: {listen_port}")
     logger.info(f"Log Level: {log_level}") 
@@ -293,9 +318,19 @@ async def main(arguments):
     """Main function to start tshark and channel hopping."""
     await run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time)
 
-if __name__ == "__main__":
-    arguments = docopt(__doc__)  # Parse arguments using the docstring
+def main_cli():
+    """
+    Command-line entry point for the module.
+    """
+
+    # Parse arguments using docopt
+    arguments = docopt(__doc__)  
+
+    # Run the async main logic
     try:
         asyncio.run(main(arguments))
     except KeyboardInterrupt:
-        logger.info(f"Closing")
+        logger.info("Closing")
+
+if __name__ == "__main__":
+    main_cli()

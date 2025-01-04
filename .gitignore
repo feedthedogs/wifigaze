@@ -1,7 +1,12 @@
 .DS_Store
-node_modules
-/dist
+frontend/node_modules
+frontend/dist
+wifigaze/static/*
+venv
+build
+dist
 
+*.egg-info
 
 # local env files
 .env.local

@@ -1,14 +1,24 @@
 <template>
-    <GraphViewer websocket-url="ws://192.168.2.134:8765/ws" />
+    <GraphViewer :websocket-url="wsUrl" />
 </template>
 
 <script>
 import GraphViewer from './components/GraphViewer.vue'
+import { ref } from "vue";
 
 export default {
   name: 'App',
   components: {
     GraphViewer
+  },
+  setup() {
+    // Determine WebSocket URL based on the current location
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const host = window.location.host; // Includes hostname and port (if present)
+    const path = window.location.pathname.replace("/index.html","ws/");
+    const wsUrl = ref(`${protocol}://${host}/${path}`);
+
+    return { wsUrl };
   }
 }
 </script>
