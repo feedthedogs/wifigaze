@@ -277,6 +277,7 @@ export default {
     }    
 
     onMounted(() => {
+      graphPreload();
       initializeGraph();
 
       // Connect to WebSocket
@@ -297,6 +298,40 @@ export default {
       if (socket) socket.close();
       if (sigmaInstance) sigmaInstance.kill();
     });
+
+    const graphPreload = async () => {
+      try {
+        // fetch the preload graph if it exists
+        const preloadURL = props.websocketUrl.replace("ws://","http://").replace("/ws","/preload")
+        const response = await fetch(preloadURL);
+        if (response.ok) {
+          const preloadGraph = await response.json();
+          // replace the ssids object with ssids derived from json
+          const tempObj = {};
+          var counter = 0;
+          for (const node of preloadGraph.nodes) {
+            const { ssid } = node.attributes;
+            if (ssid && ssid.length > 0) {
+              if (!tempObj[ssid]) {
+                tempObj[ssid] = {
+                  color: ssidColours[counter],
+                  nodes: [node.key]
+                };
+                counter++;
+              } else {
+                tempObj[ssid].nodes.push(node.key);
+              }
+            }
+          }
+          ssids.value = tempObj;
+          graph.import(preloadGraph);
+        } else {
+          console.info('Not preloading graph:', response.status);
+        }
+      } catch (error) {
+        console.info('Not preloading graph:', error);
+      }
+    }
 
     // Function to update the counter
     function updateCounter() {

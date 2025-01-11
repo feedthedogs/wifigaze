@@ -2,7 +2,7 @@
 WLAN Channel Hopper and Server Setup.
 
 Usage:
-  wifigaze --interfaces=<interfaces> [--channels=<channels>...] [--channel-dwell-time=<seconds>] [--preload-graph=<path to json>] [--listen-ip=<ip>] [--listen-port=<port>] [--log-level=<level>]
+  wifigaze --interfaces=<interfaces> [--channels=<channels>...] [--channel-dwell-time=<seconds>] [--preload-graph=<path to json>] [--listen-ip=<ip>] [--listen-port=<port>] [--no-browser] [--log-level=<level>]
   wifigaze (-h | --help)
 
 Examples:
@@ -16,17 +16,19 @@ Options:
   --preload-graph=<path to json>     Preload graph that was previously exported [default: None]
   --listen-ip=<ip>                   IP address to listen on [default: 127.0.0.1].
   --listen-port=<port>               Port to listen on [default: 8765].
+  --no-browser                       Do not launch the browser interface
   --log-level=<level>                Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL) [default: INFO].
   -h --help                          Show this help message and exit.
 """
 
 import asyncio
 import subprocess
-from quart import Quart, websocket, send_from_directory
+from quart import Quart, websocket, send_from_directory, send_file, Response
 import asyncio
 import os
 import sys
 import signal
+import webbrowser
 from enum import StrEnum
 from docopt import docopt
 from loguru import logger
@@ -173,8 +175,25 @@ app = Quart(__name__, static_folder='static')
 
 @app.route('/')
 async def serve_index():
-    logger.info(f"webserver: 404 not found: {app.static_folder} index.html")
+    logger.info(f"webserver: {app.static_folder} index.html")
     return await send_from_directory(app.static_folder, "index.html")
+
+@app.route('/preload')
+async def serve_preload():
+    if app.graph_json != 'None':
+        logger.info(f"webserver: preloading json: {app.graph_json}")
+        response = await send_file(app.graph_json)
+        response.headers.add("Access-Control-Allow-Origin", "*")  # Allow all origins
+        response.headers.add("Access-Control-Allow-Methods", "GET, OPTIONS")  # Specify allowed methods
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response
+    else:
+        logger.info(f"webserver: no preload")
+        response = await app.make_response((Response("No preload graph found"), 404))
+        response.headers.add("Access-Control-Allow-Origin", "*")  # Allow all origins
+        response.headers.add("Access-Control-Allow-Methods", "GET, OPTIONS")  # Specify allowed methods
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")        
+        return response
 
 @app.route('/<path:path>')
 async def serve_static_files(path):
@@ -225,7 +244,7 @@ async def broadcast(data):
         await client.send(data)
 
 # Function for running Hypercorn
-async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time):
+async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, graph_json):
     from hypercorn.asyncio import serve
     from hypercorn.config import Config
 
@@ -235,6 +254,7 @@ async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_
     app.interfaces = interfaces
     app.channels = channels
     app.channel_dwell_time = channel_dwell_time
+    app.graph_json = graph_json
 
     # Run the Hypercorn server
     await serve(app, config)
@@ -301,6 +321,7 @@ async def main(arguments):
     graph_json = arguments["--preload-graph"]
     listen_ip = arguments["--listen-ip"]
     listen_port = int(arguments["--listen-port"])
+    no_browser = arguments["--no-browser"]
     log_level = arguments["--log-level"].upper()
 
     if type(interfaces) != list:
@@ -318,10 +339,14 @@ async def main(arguments):
     logger.info(f"Preload graph: {graph_json}")
     logger.info(f"Listen IP: {listen_ip}")
     logger.info(f"Listen Port: {listen_port}")
-    logger.info(f"Log Level: {log_level}") 
+    logger.info(f"Log Level: {log_level}")
+
+    if not no_browser:
+        url = f"http://{listen_ip}:{listen_port}/"
+        webbrowser.open(url)
 
     """Main function to start tshark and channel hopping."""
-    await run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time)
+    await run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, graph_json)
 
 def main_cli():
     """
