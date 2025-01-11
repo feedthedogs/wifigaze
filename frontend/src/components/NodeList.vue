@@ -3,7 +3,9 @@
       <li
         v-for="node in filteredNodes"
         :key="node"
-        @click="$emit('highlightNode', node)"
+        @mousemove="$emit('highlightNode', node)"
+        @touchmove="$emit('highlightNode', node)"
+        @click="$emit('gotoNode', node)"
       >
         {{ node }}
       </li>

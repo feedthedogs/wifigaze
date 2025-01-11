@@ -37,7 +37,7 @@
       // Exclude specific keys like 'x', 'y', 'size'
       filteredAttributes() {
         return Object.entries(this.attributes)
-          .filter(([key]) => !['x', 'y', 'size'].includes(key))
+          .filter(([key]) => !['x', 'y', 'size', 'forceLabel'].includes(key))
           .reduce((acc, [key, value]) => {
             acc[key] = value;
             return acc;

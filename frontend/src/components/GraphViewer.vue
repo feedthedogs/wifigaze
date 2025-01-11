@@ -8,7 +8,7 @@
 
     <!-- Legend Panel -->
     <div class="panel legend-panel">
-      <LegendTable :ssids="ssids" :ssidColours="ssidColours" />
+      <LegendTable :ssids="ssids" :ssidColours="ssidColours" @highlightNode="highlightNode" @gotoNode="gotoNode" />
       <div
           class="resizer resizer-left"
           @mousedown="startResize('left', $event)"
@@ -24,9 +24,9 @@
     <div class="panel properties-panel">
       <AttributesTable :attributes="attributes" />
       <SearchComponent :updateSearch="updateSearch" />
-      <NodeList :filteredNodes="filteredNodes" @highlightNode="highlightNode" />
+      <NodeList :filteredNodes="filteredNodes" @highlightNode="highlightNode" @gotoNode="gotoNode" />
       <div id="export-panel">
-        <button @click="downloadFile(graph)">Export Graph</button>
+        <button @click="exportGraph()">Export Graph</button>
       </div>
       <div
           class="resizer resizer-right"
@@ -229,7 +229,7 @@ export default {
 
     const nodeReducer = (key, attributes) => {
       let color = themes[theme].nodeColor
-      if (attributes.ssid == '' || attributes.ssid == '<MISSING>') return { ...attributes, color };
+      if (attributes.ssid == '') return { ...attributes, color };
       color = ssids.value[attributes.ssid[0]]['color'];
       return { ...attributes, color };
     }
@@ -242,11 +242,20 @@ export default {
       return { ...attributes, color };
     }
 
+    function gotoNode(nodeKey) {
+    // Get the node display data (ie. its coordinate relative to the actual camera state)
+    const nodeDisplayData = sigmaInstance.getNodeDisplayData(nodeKey);
+    if (nodeDisplayData) {
+      // calling the animate function to go to the node coordinates
+      sigmaInstance.getCamera().animate(nodeDisplayData);
+   }
+}
+
     // Helper function to highlight connected nodes and edges
     function highlightNode(nodeKey) {
       sigmaInstance.setSetting('nodeReducer', (node, data) => {
         if (node === nodeKey || graph.neighbors(nodeKey).includes(node)) {
-          return { ...data, color: data.color };
+          return { ...data, color: data.color, labelColor: '#000000' };
         }
         return { ...data, color: '#E0E0E0' };
       });
@@ -295,7 +304,11 @@ export default {
         const edgeCount = graph.edges().length;
         const counterElement = document.getElementById('counter');
         counterElement.innerText = `Nodes: ${nodeCount}, Edges: ${edgeCount}`;
-    }    
+    }  
+    
+    function exportGraph() {
+      downloadFile(graph);
+    }
 
     // Define themes
     const themes = {
@@ -341,14 +354,15 @@ export default {
     }
 
     return { container, 
-      infopanel, 
-      downloadFile, 
+      infopanel,
+      exportGraph, 
       attributes, 
       ssids, 
       ssidColours, 
       filteredNodes, 
       updateSearch, 
-      highlightNode, 
+      highlightNode,
+      gotoNode,
       leftPanelWidth,
       rightPanelWidth,
       isLandscape,

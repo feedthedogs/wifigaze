@@ -1,5 +1,5 @@
 <template>
-  <h2>Legend</h2>
+  <h2>SSIDs</h2>
   <div id="legend-items">
     <div class="legend-item" v-for="(ssid, index) in limitedSsids" :key="index">
       <div class="legend-color" :style="{ backgroundColor: ssidColours[index] }"></div>
