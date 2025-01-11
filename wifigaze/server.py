@@ -2,7 +2,7 @@
 WLAN Channel Hopper and Server Setup.
 
 Usage:
-  wifigaze --interfaces=<interfaces> [--channels=<channels>...] [--channel-dwell-time=<seconds>] [--preload-graph=<path to json>] [--listen-ip=<ip>] [--listen-port=<port>] [--no-browser] [--log-level=<level>]
+  wifigaze --interfaces=<interfaces> [--channels=<channels>...] [--channel-dwell-time=<seconds>] [--no-monitormode] [--preload-graph=<path to json>] [--listen-ip=<ip>] [--listen-port=<port>] [--no-browser] [--log-level=<level>]
   wifigaze (-h | --help)
 
 Examples:
@@ -13,6 +13,7 @@ Options:
   --interfaces=<interfaces>          List of WLAN interfaces to use (e.g. wlan0,wlan1).
   --channels=<channels>              List of channels to scan [default: 1,6,11,36,40,44,48,149,153,157,161].
   --channel-dwell-time=<seconds>     Time interface should listen on channel before moving to the next [default: 1]
+  --no-monitormode                   Launches the interface without listening to the wlan interfaces
   --preload-graph=<path to json>     Preload graph that was previously exported [default: None]
   --listen-ip=<ip>                   IP address to listen on [default: 127.0.0.1].
   --listen-port=<port>               Port to listen on [default: 8765].
@@ -183,16 +184,12 @@ async def serve_preload():
     if app.graph_json != 'None':
         logger.info(f"webserver: preloading json: {app.graph_json}")
         response = await send_file(app.graph_json)
-        response.headers.add("Access-Control-Allow-Origin", "*")  # Allow all origins
-        response.headers.add("Access-Control-Allow-Methods", "GET, OPTIONS")  # Specify allowed methods
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        add_api_headers(response) 
         return response
     else:
         logger.info(f"webserver: no preload")
         response = await app.make_response((Response("No preload graph found"), 404))
-        response.headers.add("Access-Control-Allow-Origin", "*")  # Allow all origins
-        response.headers.add("Access-Control-Allow-Methods", "GET, OPTIONS")  # Specify allowed methods
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")        
+        add_api_headers(response) 
         return response
 
 @app.route('/<path:path>')
@@ -206,6 +203,14 @@ async def serve_static_files(path):
         return await send_from_directory(app.static_folder, path)
     logger.info(f"webserver: 404 not found: {path}")
     return "File not found", 404
+
+def add_api_headers(response):
+    response.headers.add("Access-Control-Allow-Origin", "*")  # Allow all origins
+    response.headers.add("Access-Control-Allow-Methods", "GET, OPTIONS")  # Specify allowed methods
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type") 
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
 
 # WebSocket connections storage
 connected_clients = set()
@@ -230,12 +235,13 @@ async def ws():
 
 @app.before_serving
 async def startup():
-    # Start tshark processes for all interfaces
-    for interface in app.interfaces:
-        app.add_background_task(start_tshark, interface) 
+    if not app.no_monitormode:
+        # Start tshark processes for all interfaces
+        for interface in app.interfaces:
+            app.add_background_task(start_tshark, interface) 
 
-    # Start channel hopping for each interface
-    app.add_background_task(hop_channels, app.interfaces, app.channels, app.channel_dwell_time)
+        # Start channel hopping for each interface
+        app.add_background_task(hop_channels, app.interfaces, app.channels, app.channel_dwell_time)
     logger.info(f"webserver: Started")
 
 async def broadcast(data):
@@ -244,7 +250,7 @@ async def broadcast(data):
         await client.send(data)
 
 # Function for running Hypercorn
-async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, graph_json):
+async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, no_monitormode, graph_json):
     from hypercorn.asyncio import serve
     from hypercorn.config import Config
 
@@ -255,6 +261,7 @@ async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_
     app.channels = channels
     app.channel_dwell_time = channel_dwell_time
     app.graph_json = graph_json
+    app.no_monitormode = no_monitormode
 
     # Run the Hypercorn server
     await serve(app, config)
@@ -318,6 +325,7 @@ async def main(arguments):
     interfaces = arguments["--interfaces"].split(',')
     channels = list(map(int, arguments["--channels"][0].split(',')))
     channel_dwell_time = int(arguments["--channel-dwell-time"])
+    no_monitormode = arguments["--no-monitormode"]
     graph_json = arguments["--preload-graph"]
     listen_ip = arguments["--listen-ip"]
     listen_port = int(arguments["--listen-port"])
@@ -333,9 +341,12 @@ async def main(arguments):
     logger.add(sys.stdout, level=log_level)
 
     logger.info("Script started with the following arguments:")
-    logger.info(f"WLAN Interfaces: {interfaces}")
-    logger.info(f"Channels: {channels}")
-    logger.info(f"Channel dwell time: {channel_dwell_time}s")
+    if not no_monitormode:
+        logger.info(f"WLAN Interfaces: {interfaces}")
+        logger.info(f"Channels: {channels}")
+        logger.info(f"Channel dwell time: {channel_dwell_time}s")
+    else:
+        logger.info(f"Not listening to wlan interfaces due to no-monitormode flag")
     logger.info(f"Preload graph: {graph_json}")
     logger.info(f"Listen IP: {listen_ip}")
     logger.info(f"Listen Port: {listen_port}")
@@ -346,7 +357,7 @@ async def main(arguments):
         webbrowser.open(url)
 
     """Main function to start tshark and channel hopping."""
-    await run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, graph_json)
+    await run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, no_monitormode, graph_json)
 
 def main_cli():
     """
