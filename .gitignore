@@ -6,6 +6,7 @@ venv
 build
 dist
 vendorCats
+__pycache__
 
 *.egg-info
 

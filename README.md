@@ -13,7 +13,8 @@ Features:
 To use WifiGaze, you need:
 1. Python3
 2. Wireless network interface(s) in monitor mode - See [Example configuring of Monitor mode](https://github.com/aircrack-ng/rtl8812au).
-3. Sudo/root access - root is required to hop between wifi channels, if you have the same number of channels as wlan interfaces there is no requirement for root
+3. Wireshark (tshark)
+4. Sudo/root access - root is required to hop between wifi channels, if you have the same number of channels as wlan interfaces there is no requirement for root
 
 ### Running WifiGaze
 
