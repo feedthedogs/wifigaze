@@ -310,16 +310,18 @@ export default {
           const tempObj = {};
           var counter = 0;
           for (const node of preloadGraph.nodes) {
-            const { ssid } = node.attributes;
-            if (ssid && ssid.length > 0) {
-              if (!tempObj[ssid]) {
-                tempObj[ssid] = {
-                  color: ssidColours[counter],
-                  nodes: [node.key]
-                };
-                counter++;
-              } else {
-                tempObj[ssid].nodes.push(node.key);
+            const { ssidlist } = node.attributes;
+            if (ssidlist && ssidlist.length > 0) {
+              for (const ssid of ssidlist) {
+                if (!tempObj[ssid]) {
+                  tempObj[ssid] = {
+                    color: ssidColours[counter],
+                    nodes: [node.key]
+                  };
+                  counter++;
+                } else {
+                  tempObj[ssid].nodes.push(node.key);
+                }
               }
             }
           }

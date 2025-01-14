@@ -5,6 +5,7 @@ wifigaze/static/*
 venv
 build
 dist
+vendorCats
 
 *.egg-info
 
