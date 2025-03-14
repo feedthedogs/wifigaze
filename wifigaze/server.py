@@ -29,7 +29,7 @@ import webbrowser
 from docopt import docopt
 from loguru import logger
 
-from webserver import run_quart
+from .webserver import run_quart
 
 async def main(arguments):
 

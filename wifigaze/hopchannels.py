@@ -1,9 +1,14 @@
 import signal
 import asyncio
+import os
 
 from loguru import logger
 
 async def run_command_with_signal_handling(command):
+    # Check if running as root
+    if os.geteuid() == 0 and command[0] == "sudo":
+        command = command[1:]  # Remove 'sudo' if running as root
+    
     # Start the subprocess
     process = await asyncio.create_subprocess_exec(*command)
     

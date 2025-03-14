@@ -16,7 +16,7 @@ export const ieee80211_frequency_to_channel = (freq) => {
     return freq / 5 - 1000;
 }
 
-const WlanFrameSubtypes = Object.freeze({
+export const WlanFrameSubtypes = Object.freeze({
     ASSOCIATION_REQUEST: 0x0000,
     ASSOCIATION_RESPONSE: 0x0001,
     REASSOCIATION_REQUEST: 0x0002,

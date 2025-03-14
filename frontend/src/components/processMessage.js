@@ -1,4 +1,4 @@
-import { ssidString, ieee80211_frequency_to_channel, WlanFrameSubtype } from './wifiUtils.js';
+import { ssidString, ieee80211_frequency_to_channel, WlanFrameSubtype, WlanFrameSubtypes } from './wifiUtils.js';
 import getVendor from 'mac-oui-lookup';
 
 export const processMessage = (graph, event, ssids, ssidColours) => {
@@ -16,9 +16,9 @@ export const processMessage = (graph, event, ssids, ssidColours) => {
     }
 
     processNode(graph, ssids, ssidColours, ta, ssid, bssid, radio_channel, flags, packet_type, packet_subtype)
-    if (!['0x0004', '0x0008'].includes(packet_subtype)) { // don't process some management packets on any other than the source
+    if (![WlanFrameSubtypes.PROBE_REQUEST, WlanFrameSubtypes.BEACON].includes(packet_subtype)) { // don't process some management packets on any other than the source
         processNode(graph, ssids, ssidColours, ra, ssid, bssid, radio_channel, flags, packet_type, null)
-        if (!['0x0005'].includes(packet_subtype)) { // don't process some management packets on any other than the source
+        if (![WlanFrameSubtypes.PROBE_RESPONSE].includes(packet_subtype)) { // don't process some management packets on any other than the source
             processNode(graph, ssids, ssidColours, sa, ssid, bssid, radio_channel, flags, packet_type, null)
             processNode(graph, ssids, ssidColours, da, ssid, bssid, radio_channel, flags, packet_type, null)
 
@@ -31,7 +31,7 @@ const processNode = (graph, ssids, ssidColours, mac, ssidHex, bssid, radio_chann
     if (mac == '' || mac == 'ff:ff:ff:ff:ff:ff') return;
 
     const channel = ieee80211_frequency_to_channel(radio_channel);
-    const isAP = mac == bssid || packet_subtype == '0x0008';
+    const isAP = mac == bssid || packet_subtype == WlanFrameSubtypes.BEACON; //'0x0008'
 
     const ssid_string = ssidString(ssidHex);
     const ssid = isAP ? ssid_string : "";

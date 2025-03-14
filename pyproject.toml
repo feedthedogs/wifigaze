@@ -1,3 +1,31 @@
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "wifigaze"  # This is required
+version = "0.1.0"  # This is required
+description = "Visualise the wifi devices around you communicating to each other in their own networks"
+authors = [{name = "feedthedogs", email = "feedthedogs@hotmail.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+keywords = ["wifi", "visualization", "network"]
+dependencies = [
+    "quart",
+    "docopt",
+    "loguru"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+
+[project.scripts]
+wifigaze = "wifigaze.__main__:main_cli"
+
+[project.urls]
+Homepage = "https://github.com/feedthedogs/wifigaze"
+
+[tool.setuptools]
+packages = ["wifigaze"]

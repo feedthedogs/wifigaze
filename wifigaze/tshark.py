@@ -4,7 +4,7 @@ import os
 
 from loguru import logger
 
-from processframe import filter_frames
+from .processframe import filter_frames
 
 async def start_tshark(interface, broadcast):
     """Start a tshark process to capture packets on an interface."""

@@ -9,12 +9,23 @@ Features:
 - Web interface that can be accessed locally or configured remotely
 - Supports exporting and importing of graphs.
 
+![Alt text](WifiGazeScreenshot.png?raw=true "WifiGaze example network screenshot")
+
 ### Requirements
-To use WifiGaze, you need:
+To use WifiGaze, you need something like default Kali (which gives the first 3):
 1. Python3
-2. Wireless network interface(s) in monitor mode - See [Example configuring of Monitor mode](https://github.com/aircrack-ng/rtl8812au).
-3. Wireshark (tshark)
-4. Sudo/root access - root is required to hop between wifi channels, if you have the same number of channels as wlan interfaces there is no requirement for root
+2. Wireshark (tshark)
+3. sudo/root access - eg. default Kali. root is required to hop between wifi channels, it won't hop channels if you have the same number of interfaces as channels you are monitoring
+4. Wireless network interface(s) in monitor mode - See [Example configuring of Monitor mode](https://github.com/aircrack-ng/rtl8812au).
+
+### Installing WifiGaze
+
+Create a virtual environment and install the wheel
+```
+virtualenv venv
+source venv/bin/activate
+pip install wifigaze-0.1.0-py3-none-any.whl
+```
 
 ### Running WifiGaze
 
@@ -28,7 +39,9 @@ For WLAN interfaces that don't support 5GHz, limit the channels to scan:
   wifigaze --interfaces=wlan1 --channels=1,6,11
 ```
 
-Command Line Options:
+Once WifiGaze is running you can navigate to the web interface: http://127.0.0.1:8765
+
+### Command Line Options:
 
 | Option | Description | Default |
 | ------ | ----------- | ------- |
@@ -47,8 +60,9 @@ Command Line Options:
 
 WifiGaze requires Python 3 and Node.js to build. Use the following commands: 
 ```
+python buildvue.py
 python -m pip install --user setuptools wheel
-python setup.py sdist bdist_wheel
+python -m build
 ```
 
 

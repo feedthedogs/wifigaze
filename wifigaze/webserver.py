@@ -4,8 +4,8 @@ import os
 from quart import Quart, websocket, send_from_directory, send_file, Response
 from loguru import logger
 
-from tshark import start_tshark
-from hopchannels import hop_channels
+from .tshark import start_tshark
+from .hopchannels import hop_channels
 
 # Create Quart app
 app = Quart(__name__, static_folder='static')
