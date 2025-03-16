@@ -1,5 +1,5 @@
 export const ssidString = (hex) => {
-    if (hex == '') return '';
+    if (hex == undefined) return '';
     if (hex == '<MISSING>') return '<HIDDEN>';
     if (/^0+$/.test(hex)) return '<HIDDEN>';
     return hex.match(/.{1,2}/g).map(function (v) {

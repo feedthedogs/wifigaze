@@ -61,7 +61,7 @@ async def ws():
         while True:
             # Receive data from the client
             data = await websocket.receive()
-            logger.trace(f"websocket: recieved data: {data}")
+            logger.trace(f"websocket: received data: {data}")
     except asyncio.CancelledError:
         pass
     finally:
@@ -72,18 +72,28 @@ async def ws():
 @app.before_serving
 async def startup():
     if not app.no_monitormode:
+        # Create a queue for broadcasting data with a max size of 100
+        app.queue = asyncio.Queue(maxsize=100)
+
         # Start tshark processes for all interfaces
         for interface in app.interfaces:
-            app.add_background_task(start_tshark, interface, broadcast) 
+            app.add_background_task(start_tshark, interface, app.queue) 
 
         # Start channel hopping for each interface
         app.add_background_task(hop_channels, app.interfaces, app.channels, app.channel_dwell_time)
+
+        # Start the broadcast task
+        app.add_background_task(broadcast)
+
     logger.info(f"webserver: Started")
 
-async def broadcast(data):
-    # Broadcast the data to all connected clients
-    for client in connected_clients:
-        await client.send(data)
+async def broadcast():
+    while True:
+        # Read data from the queue
+        data = await app.queue.get()
+        # Broadcast the data to all connected clients
+        for client in connected_clients:
+            await client.send(data)
 
 # Function for running Hypercorn
 async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, no_monitormode, graph_json):

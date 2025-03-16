@@ -1,37 +1,38 @@
 from enum import StrEnum
 from loguru import logger
 
-def filter_frames(decoded_line):
-    ta, ra, sa, da, length, ssid, bssid, frequency, flags, frame_type, frame_subtype = decoded_line.split(',')
-    if filter_macs(ta):
-        logger.trace(f"ignored mac ta: {decoded_line}")
+def filter_frames(packet):
+    if packet['wlan_fc_type'] == '1':
+        logger.trace(f"ignore control frames")
+        return False # control frames
+
+    if filter_macs(packet['wlan_ta']):
+        logger.trace(f"ignored mac ta")
         return False
-    if filter_macs(ra):
-        logger.trace(f"ignored mac ra: {decoded_line}")
+    if filter_macs(packet['wlan_ra']):
+        logger.trace(f"ignored mac ra")
         return False
-    if filter_macs(sa):
-        logger.trace(f"ignored mac sa: {decoded_line}")
+    if filter_macs(packet['wlan_sa']):
+        logger.trace(f"ignored mac sa")
         return False
-    if filter_macs(da): 
-        logger.trace(f"ignored mac da: {decoded_line}")
+    if filter_macs(packet['wlan_da']): 
+        logger.trace(f"ignored mac da")
         return False
 
-    if frame_type == '1':
-        logger.trace(f"ignore control frames: {decoded_line}")
-        return False # control frames
-    if frame_type == '0' and frame_subtype in [ WLANFrameSubtype.ATIM,
+    if packet['wlan_fc_type'] == '0' and packet['wlan_fc_type_subtype'] in [ WLANFrameSubtype.ATIM,
                                                 WLANFrameSubtype.DISASSOCIATION,
                                                 WLANFrameSubtype.AUTHENTICATION,  
                                                 WLANFrameSubtype.ACTION,
                                                 WLANFrameSubtype.ACTION_NO_ACK]:
-        logger.trace(f"ignore some management frames: {decoded_line}")
+        logger.trace(f"ignore some management frames")
         return False # management frames
-    if frame_type == '2' and frame_subtype in [WLANFrameSubtype.NULL]:
-        logger.trace(f"ignore null data frames: {decoded_line}")
+    if packet['wlan_fc_type'] == '2' and packet['wlan_fc_type_subtype'] in [WLANFrameSubtype.NULL]:
+        logger.trace(f"ignore null data frames")
         return False # data frames
     return True
 
 def filter_macs(mac):
+    if mac is None: return False
     if mac.startswith("01:00:5e"):
         return True # multicast group
     if mac.startswith("33:33"):

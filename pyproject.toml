@@ -3,8 +3,8 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "wifigaze"  # This is required
-version = "0.1.0"  # This is required
+name = "wifigaze"
+version = "0.2.0"
 description = "Visualise the wifi devices around you communicating to each other in their own networks"
 authors = [{name = "feedthedogs", email = "feedthedogs@hotmail.com"}]
 license = {text = "MIT"}
@@ -13,7 +13,8 @@ keywords = ["wifi", "visualization", "network"]
 dependencies = [
     "quart",
     "docopt",
-    "loguru"
+    "loguru",
+    "pyshark"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

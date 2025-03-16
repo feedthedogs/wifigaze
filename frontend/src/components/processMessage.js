@@ -3,11 +3,24 @@ import getVendor from 'mac-oui-lookup';
 
 export const processMessage = (graph, event, ssids, ssidColours) => {
     //for (const line of event.data) {
-    const elements = event.data.split(",");
-    if (elements.length < 3) return;
+    const packet = JSON.parse(event.data);
+    //const elements = event.data.split(",");
+    //if (elements.length < 3) return;
+
+    const ta = packet['wlan_ta'];
+    const ra = packet['wlan_ra'];
+    const sa = packet['wlan_sa'];
+    const da = packet['wlan_da'];
+    const packetLength = packet['frame_len'];
+    const ssid = packet['wlan_ssid'];
+    const bssid = packet['wlan_bssid'];
+    const radio_channel = packet['wlan_radio_channel'];
+    const flags = packet['wlan_flags'];
+    const packet_type = packet['wlan_type'];
+    const packet_subtype = packet['wlan_subtype'];
 
     // eslint-disable-next-line
-    const [ta, ra, sa, da, packetLength, ssid, bssid, radio_channel, flags, packet_type, packet_subtype] = elements.map((e) => e.trim());
+    //const [ta, ra, sa, da, packetLength, ssid, bssid, radio_channel, flags, packet_type, packet_subtype] = elements.map((e) => e.trim());
     if (!packetLength || ta == '' || ra == '') return;
 
     if (ta == '00:00:00:00:00:00') {

@@ -15,16 +15,17 @@ Features:
 To use WifiGaze, you need something like default Kali (which gives the first 3):
 1. Python3
 2. Wireshark (tshark)
-3. sudo/root access - eg. default Kali. root is required to hop between wifi channels, it won't hop channels if you have the same number of interfaces as channels you are monitoring
+3. sudo/root access - root is required to hop between wifi channels, it won't hop channels if you have the same number of interfaces as channels you are monitoring
 4. Wireless network interface(s) in monitor mode - See [Example configuring of Monitor mode](https://github.com/aircrack-ng/rtl8812au).
+5. if using a rpi `sudo apt-get install libxml2-dev libxslt-dev`
 
 ### Installing WifiGaze
 
-Create a virtual environment and install the wheel
+Create a virtual environment and install the wheel from the releases to the right
 ```
 virtualenv venv
 source venv/bin/activate
-pip install wifigaze-0.1.0-py3-none-any.whl
+pip install wifigaze-0.2.0-py3-none-any.whl
 ```
 
 ### Running WifiGaze
