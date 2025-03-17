@@ -25,9 +25,18 @@
       <AttributesTable :attributes="attributes" />
       <SearchComponent :updateSearch="updateSearch" />
       <NodeList :filteredNodes="filteredNodes" @highlightNode="highlightNode" @gotoNode="gotoNode" />
+      
+      <!-- WebSocket Status and Packet Count -->
+      <div id="websocket-status">
+        <span :class="websocketStatusClass">{{ websocketStatus }}</span>
+        <span>Packets per 10 seconds: {{ packetCount }}</span>
+        <button v-if="websocketStatus == 'Disconnected'" @click="reconnectWebSocket">Reconnect</button>
+      </div>
+
       <div id="export-panel">
         <button @click="exportGraph()">Export Graph</button>
       </div>
+      
       <div
           class="resizer resizer-right"
           @mousedown="startResize('right', $event)"
@@ -85,6 +94,11 @@ export default {
     const rightPanelWidth = ref(350); // Initial width in pixels
     const resizing = ref(null); // Track which panel is being resized  
     const startX = ref(0); // Track the starting x-coordinate for touch/mouse  
+
+    const websocketStatus = ref("Disconnected");
+    const websocketStatusClass = ref("disconnected");
+    const packetCount = ref(0);
+    let packetCounter = 0;
 
     function initializeGraph() {
       if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -191,6 +205,10 @@ export default {
 
     const updateSearch = (searchTerm) => {
       const term = searchTerm.toLowerCase();
+      if (term == "") {
+        filteredNodes.value = [];
+        return;
+      }
       filteredNodes.value = graph.nodes().filter((node) => {
         const attributes = graph.getNodeAttributes(node);
         return (
@@ -207,7 +225,7 @@ export default {
     const handleWebSocketMessage = (event) => {
       try {
         processMessage(graph, event, ssids.value, ssidColours);
-
+        packetCounter++;
         scaleNodes();
         //populateLegend();
 
@@ -281,13 +299,15 @@ export default {
       initializeGraph();
 
       // Connect to WebSocket
-      socket = new WebSocket(props.websocketUrl);
-      socket.onmessage = handleWebSocketMessage;
-      socket.onerror = (error) => {
-        console.error("WebSocket error:", error);
-      };
+      connectWebSocket();
 
       window.addEventListener("resize", handleResize);
+
+      // Set interval to update packet count every 10 seconds
+      setInterval(() => {
+        packetCount.value = packetCounter;
+        packetCounter = 0;
+      }, 10000);
     });
 
     onBeforeUnmount(() => {
@@ -298,6 +318,29 @@ export default {
       if (socket) socket.close();
       if (sigmaInstance) sigmaInstance.kill();
     });
+
+    const connectWebSocket = () => {
+      socket = new WebSocket(props.websocketUrl);
+      socket.onopen = () => {
+        websocketStatus.value = "Connected";
+        websocketStatusClass.value = "connected";
+      };
+      socket.onclose = () => {
+        websocketStatus.value = "Disconnected";
+        websocketStatusClass.value = "disconnected";
+      };
+      socket.onmessage = handleWebSocketMessage;
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        websocketStatus.value = "Error";
+        websocketStatusClass.value = "error";
+      };
+    };
+
+    const reconnectWebSocket = () => {
+      if (socket) socket.close();
+      connectWebSocket();
+    };
 
     const graphPreload = async () => {
       try {
@@ -408,7 +451,11 @@ export default {
       onMouseMove,
       onMouseUp,
       onTouchMove,
-      onTouchEnd, };
+      onTouchEnd,
+      websocketStatus,
+      websocketStatusClass,
+      packetCount,
+      reconnectWebSocket };
   },
 };
 </script>
@@ -515,6 +562,29 @@ export default {
     border-radius: 5px;
     font-size: 16px;
   }  
+
+  #websocket-status {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+  }
+
+  #websocket-status span {
+    margin-right: 10px;
+  }
+
+  .connected {
+    color: green;
+  }
+
+  .disconnected {
+    color: red;
+  }
+
+  .error {
+    color: orange;
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;
@@ -526,5 +596,19 @@ export default {
   th, td {
     padding: 8px;
     text-align: left;
+  }
+
+  button {
+    margin-left: 10px;
+    padding: 5px 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background-color: #0056b3;
   }
 </style>

@@ -1,43 +1,41 @@
-import { ssidString, ieee80211_frequency_to_channel, WlanFrameSubtype, WlanFrameSubtypes } from './wifiUtils.js';
+import { ssidString, ieee80211_frequency_to_channel, WlanFrametype, WlanFrameSubtype, WlanFrameSubtypes } from './wifiUtils.js';
 import getVendor from 'mac-oui-lookup';
 
 export const processMessage = (graph, event, ssids, ssidColours) => {
-    //for (const line of event.data) {
-    const packet = JSON.parse(event.data);
-    //const elements = event.data.split(",");
-    //if (elements.length < 3) return;
+    const packets = JSON.parse(event.data);
+    packets.forEach(packet => {
+        const ta = packet['wlan_ta'];
+        const ra = packet['wlan_ra'];
+        const sa = packet['wlan_sa'];
+        const da = packet['wlan_da'];
+        const packetLength = packet['frame_len'];
+        const ssid = packet['wlan_ssid'];
+        const bssid = packet['wlan_bssid'];
+        const radio_channel = packet['radiotap_channel_freq'];
+        const flags = packet['wlan_flags_str'];
+        const packet_type = packet['wlan_fc_type'];
+        const packet_subtype = packet['wlan_fc_type_subtype'];
 
-    const ta = packet['wlan_ta'];
-    const ra = packet['wlan_ra'];
-    const sa = packet['wlan_sa'];
-    const da = packet['wlan_da'];
-    const packetLength = packet['frame_len'];
-    const ssid = packet['wlan_ssid'];
-    const bssid = packet['wlan_bssid'];
-    const radio_channel = packet['wlan_radio_channel'];
-    const flags = packet['wlan_flags'];
-    const packet_type = packet['wlan_type'];
-    const packet_subtype = packet['wlan_subtype'];
+        // eslint-disable-next-line
+        //const [ta, ra, sa, da, packetLength, ssid, bssid, radio_channel, flags, packet_type, packet_subtype] = elements.map((e) => e.trim());
+        if (!packetLength || ta == '' || ra == '') return;
 
-    // eslint-disable-next-line
-    //const [ta, ra, sa, da, packetLength, ssid, bssid, radio_channel, flags, packet_type, packet_subtype] = elements.map((e) => e.trim());
-    if (!packetLength || ta == '' || ra == '') return;
-
-    if (ta == '00:00:00:00:00:00') {
-        console.log("unusal client: " + event.data);
-        return;
-    }
-
-    processNode(graph, ssids, ssidColours, ta, ssid, bssid, radio_channel, flags, packet_type, packet_subtype)
-    if (![WlanFrameSubtypes.PROBE_REQUEST, WlanFrameSubtypes.BEACON].includes(packet_subtype)) { // don't process some management packets on any other than the source
-        processNode(graph, ssids, ssidColours, ra, ssid, bssid, radio_channel, flags, packet_type, null)
-        if (![WlanFrameSubtypes.PROBE_RESPONSE].includes(packet_subtype)) { // don't process some management packets on any other than the source
-            processNode(graph, ssids, ssidColours, sa, ssid, bssid, radio_channel, flags, packet_type, null)
-            processNode(graph, ssids, ssidColours, da, ssid, bssid, radio_channel, flags, packet_type, null)
-
-            processEdges(graph, ta, ra, sa, da)
+        if (ta == '00:00:00:00:00:00') {
+            console.log("unusal client: " + event.data);
+            return;
         }
-    }
+
+        processNode(graph, ssids, ssidColours, ta, ssid, bssid, radio_channel, flags, packet_type, packet_subtype)
+        if (![WlanFrameSubtypes.PROBE_REQUEST, WlanFrameSubtypes.BEACON].includes(packet_subtype)) { // don't process some management packets on any other than the source
+            processNode(graph, ssids, ssidColours, ra, ssid, bssid, radio_channel, flags, packet_type, null)
+            if (![WlanFrameSubtypes.PROBE_RESPONSE].includes(packet_subtype)) { // don't process some management packets on any other than the source
+                processNode(graph, ssids, ssidColours, sa, ssid, bssid, radio_channel, flags, packet_type, null)
+                processNode(graph, ssids, ssidColours, da, ssid, bssid, radio_channel, flags, packet_type, null)
+
+                processEdges(graph, ta, ra, sa, da)
+            }
+        }
+    });
 }
 
 const processNode = (graph, ssids, ssidColours, mac, ssidHex, bssid, radio_channel, flags, packet_type, packet_subtype) => {
@@ -145,7 +143,7 @@ const processNode = (graph, ssids, ssidColours, mac, ssidHex, bssid, radio_chann
         // Node last seen
         graph.setNodeAttribute(mac, 'lastseen', Date.now());
         // Packettype stats
-        attributes['stats'][packet_type] = (attributes['stats'][packet_type] ?? 0) + 1;
+        attributes['stats'][WlanFrametype(packet_type)] = (attributes['stats'][WlanFrametype(packet_type)] ?? 0) + 1;
         if (packet_subtype != null)
             attributes['stats'][WlanFrameSubtype(packet_subtype)] = (attributes['stats'][WlanFrameSubtype(packet_subtype)] ?? 0) + 1;
         graph.setNodeAttribute(mac, 'stats', attributes['stats']);

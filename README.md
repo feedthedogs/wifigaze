@@ -25,7 +25,7 @@ Create a virtual environment and install the wheel from the releases to the righ
 ```
 virtualenv venv
 source venv/bin/activate
-pip install wifigaze-0.2.0-py3-none-any.whl
+pip install wifigaze-0.3.0-py3-none-any.whl
 ```
 
 ### Running WifiGaze

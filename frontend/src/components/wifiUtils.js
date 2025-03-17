@@ -60,9 +60,23 @@ export const WlanFrameSubtypes = Object.freeze({
     QOS_CF_ACK_CF_POLL: 0x002F,   
 });
 
+export const WlanFrametypes = Object.freeze({
+    MANAGEMENT: 0x00,
+    CONTROL: 0x01,
+    DATA: 0x02,
+    RESERVED: 0x03,
+});
+
+export const WlanFrametype = (value) => {
+    // eslint-disable-next-line
+    const entry = Object.entries(WlanFrametypes).find(([_, v]) => v === parseInt(value,16));
+    if (entry == undefined && value != null) console.log(value)
+    return entry ? entry[0] : "UNKNOWN (" + value + ")";
+}
+
 export const WlanFrameSubtype = (value) => {
     // eslint-disable-next-line
     const entry = Object.entries(WlanFrameSubtypes).find(([_, v]) => v === parseInt(value,16));
     if (entry == undefined && value != null) console.log(value)
-    return entry ? entry[0] : "UNKNOWN";
+    return entry ? entry[0] : "UNKNOWN (" + value + ")";
 }

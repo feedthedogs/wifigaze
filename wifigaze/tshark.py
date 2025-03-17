@@ -28,7 +28,7 @@ def capture_packets(interface, queue):
             if not filter_frames(dist_packet):
                 continue
             logger.trace(f"data: {dist_packet}")
-            packet_string = json.dumps(dist_packet)
+            packet_string = dist_packet
             if queue.full():
                 logger.warning("Queue is full, dropping packet")
             else:

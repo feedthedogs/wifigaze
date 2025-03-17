@@ -1,5 +1,6 @@
 import asyncio
 import os
+import json
 
 from quart import Quart, websocket, send_from_directory, send_file, Response
 from loguru import logger
@@ -72,7 +73,7 @@ async def ws():
 @app.before_serving
 async def startup():
     if not app.no_monitormode:
-        # Create a queue for broadcasting data with a max size of 100
+        # Create a queue for broadcasting data
         app.queue = asyncio.Queue(maxsize=100)
 
         # Start tshark processes for all interfaces
@@ -89,11 +90,14 @@ async def startup():
 
 async def broadcast():
     while True:
-        # Read data from the queue
-        data = await app.queue.get()
+        items = []
+        items.append(await app.queue.get())
+        # Read data from the queue up to 10 items at a time
+        while not app.queue.empty() and len(items) < 10:
+            items.append(await app.queue.get())
         # Broadcast the data to all connected clients
         for client in connected_clients:
-            await client.send(data)
+            await client.send(json.dumps(items))
 
 # Function for running Hypercorn
 async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, no_monitormode, graph_json):
