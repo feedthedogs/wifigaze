@@ -5,11 +5,12 @@ import json
 from quart import Quart, websocket, send_from_directory, send_file, Response
 from loguru import logger
 
-from .tshark import start_tshark
+from .tshark import start_tshark, replay_pcap
 from .hopchannels import hop_channels
 
 # Create Quart app
 app = Quart(__name__, static_folder='static')
+app.replay_task_started = False
 
 @app.route('/')
 async def serve_index():
@@ -57,6 +58,9 @@ connected_clients = set()
 async def ws():
     # Add client to the connected_clients set
     connected_clients.add(websocket._get_current_object())
+    if app.pcap_file and not app.replay_task_started:
+        app.replay_task_started = True
+        app.add_background_task(replay_pcap, app.pcap_file, app.queue, app.loop)
     logger.info(f"websocket: client connected")
     try:
         while True:
@@ -72,21 +76,33 @@ async def ws():
 
 @app.before_serving
 async def startup():
-    if not app.no_monitormode:
+    capture_started = False
+    app.loop = asyncio.get_running_loop()
+    app.replay_task_started = False
+
+    if app.pcap_file:
+        app.queue = asyncio.Queue(maxsize=100)
+        app.add_background_task(broadcast)
+        capture_started = True
+    elif not app.no_monitormode:
         # Create a queue for broadcasting data
         app.queue = asyncio.Queue(maxsize=100)
 
         # Start tshark processes for all interfaces
         for interface in app.interfaces:
-            app.add_background_task(start_tshark, interface, app.queue) 
+            app.add_background_task(start_tshark, interface, app.queue, app.loop) 
 
         # Start channel hopping for each interface
         app.add_background_task(hop_channels, app.interfaces, app.channels, app.channel_dwell_time)
 
         # Start the broadcast task
         app.add_background_task(broadcast)
+        capture_started = True
 
-    logger.info(f"webserver: Started")
+    if capture_started:
+        logger.info("webserver: Started")
+    else:
+        logger.info("webserver: Started without capture source")
 
 async def broadcast():
     while True:
@@ -100,7 +116,7 @@ async def broadcast():
             await client.send(json.dumps(items))
 
 # Function for running Hypercorn
-async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, no_monitormode, graph_json):
+async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, no_monitormode, graph_json, pcap_file):
     from hypercorn.asyncio import serve
     from hypercorn.config import Config
 
@@ -112,6 +128,7 @@ async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_
     app.channel_dwell_time = channel_dwell_time
     app.graph_json = graph_json
     app.no_monitormode = no_monitormode
+    app.pcap_file = pcap_file
 
     # Run the Hypercorn server
     await serve(app, config)

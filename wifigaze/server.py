@@ -2,8 +2,9 @@
 WLAN Channel Hopper and Server Setup.
 
 Usage:
-  wifigaze --interfaces=<interfaces> [--channels=<channels>...] [--channel-dwell-time=<seconds>] [--no-monitormode] [--preload-graph=<path to json>] [--listen-ip=<ip>] [--listen-port=<port>] [--no-browser] [--log-level=<level>]
-  wifigaze (-h | --help)
+    wifigaze --interfaces=<interfaces> [--channels=<channels>...] [--channel-dwell-time=<seconds>] [--no-monitormode] [--preload-graph=<path to json>] [--listen-ip=<ip>] [--listen-port=<port>] [--no-browser] [--log-level=<level>]
+    wifigaze --pcap-file=<pcap> [--preload-graph=<path to json>] [--listen-ip=<ip>] [--listen-port=<port>] [--no-browser] [--log-level=<level>]
+    wifigaze (-h | --help)
 
 Examples:
   wifigaze --interfaces=wlan0
@@ -19,6 +20,7 @@ Options:
   --listen-port=<port>               Port to listen on [default: 8765].
   --no-browser                       Do not launch the browser interface
   --log-level=<level>                Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL) [default: INFO].
+  --pcap-file=<pcap>                 Replay packets from a PCAP file instead of capturing live traffic [default: None]
   -h --help                          Show this help message and exit.
 """
 
@@ -34,8 +36,16 @@ from .webserver import run_quart
 async def main(arguments):
 
     # Parse arguments
-    interfaces = arguments["--interfaces"].split(',')
-    channels = list(map(int, arguments["--channels"][0].split(',')))
+    interfaces_arg = arguments["--interfaces"]
+    interfaces = interfaces_arg.split(',') if interfaces_arg else []
+    channels_arg = arguments["--channels"]
+    if isinstance(channels_arg, list) and channels_arg:
+        channels_values = channels_arg[0]
+    elif isinstance(channels_arg, str):
+        channels_values = channels_arg
+    else:
+        channels_values = ''
+    channels = [int(value) for value in channels_values.split(',') if value]
     channel_dwell_time = int(arguments["--channel-dwell-time"])
     no_monitormode = arguments["--no-monitormode"]
     graph_json = arguments["--preload-graph"]
@@ -43,17 +53,27 @@ async def main(arguments):
     listen_port = int(arguments["--listen-port"])
     no_browser = arguments["--no-browser"]
     log_level = arguments["--log-level"].upper()
+    pcap_file = arguments["--pcap-file"]
 
     if type(interfaces) != list:
         interfaces = [interfaces]
     if type(channels) != list:
         channels = [channels]
 
+    if pcap_file == 'None':
+        pcap_file = None
+    else:
+        no_monitormode = True
+        interfaces = []
+        channels = []
+
     logger.remove(0)
     logger.add(sys.stdout, level=log_level)
 
     logger.info("Script started with the following arguments:")
-    if not no_monitormode:
+    if pcap_file:
+        logger.info(f"PCAP replay file: {pcap_file}")
+    elif not no_monitormode:
         logger.info(f"WLAN Interfaces: {interfaces}")
         logger.info(f"Channels: {channels}")
         logger.info(f"Channel dwell time: {channel_dwell_time}s")
@@ -69,7 +89,16 @@ async def main(arguments):
         webbrowser.open(url)
 
     """Main function to start tshark and channel hopping."""
-    await run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, no_monitormode, graph_json)
+    await run_quart(
+        listen_ip,
+        listen_port,
+        interfaces,
+        channels,
+        channel_dwell_time,
+        no_monitormode,
+        graph_json,
+        pcap_file,
+    )
 
 def main_cli():
     """

@@ -21,11 +21,11 @@ To use WifiGaze, you need something like default Kali (which gives the first 3):
 
 ### Installing WifiGaze
 
-Create a virtual environment and install the wheel from the releases to the right
+Create a virtual environment and install the wheel
 ```
 virtualenv venv
 source venv/bin/activate
-pip install wifigaze-0.3.0-py3-none-any.whl
+pip install wifigaze-0.4.0-py3-none-any.whl
 ```
 
 ### Running WifiGaze
@@ -38,6 +38,11 @@ Run WifiGaze with default settings and the first WLAN interface:
 For WLAN interfaces that don't support 5GHz, limit the channels to scan:
 ```
   wifigaze --interfaces=wlan1 --channels=1,6,11
+```
+
+Replay a previously captured PCAP file without requiring live interfaces:
+```
+  wifigaze --pcap-file=captures/demo.pcap
 ```
 
 Once WifiGaze is running you can navigate to the web interface: http://127.0.0.1:8765
@@ -54,6 +59,7 @@ Once WifiGaze is running you can navigate to the web interface: http://127.0.0.1
 | --listen-ip=<ip> | IP address to listen on. | 127.0.0.1 |
 | --listen-port=<port> | Port to listen on. | 8765 |
 | --no-browser | Do not launch the browser interface. | |
+| --pcap-file=<path> | Replay packets from a PCAP file instead of live capture. | None |
 | --log-level=<level> | Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL). | INFO |
 | -h, --help | Display help message and exit. | |
 
@@ -62,7 +68,7 @@ Once WifiGaze is running you can navigate to the web interface: http://127.0.0.1
 WifiGaze requires Python 3 and Node.js to build. Use the following commands: 
 ```
 python buildvue.py
-python -m pip install --user setuptools wheel
+python -m pip install --user setuptools wheel build
 python -m build
 ```
 
