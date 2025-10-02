@@ -2,12 +2,22 @@ import os
 import subprocess
 import shutil
 
+
+def resolve_npm() -> str:
+    npm_path = shutil.which('npm')
+    if not npm_path:
+        raise RuntimeError(
+            "npm executable not found. Please ensure Node.js is installed and npm is on PATH."
+        )
+    return npm_path
+
 def build_vue():
     # Navigate to the frontend directory
     frontend_dir = os.path.join(os.path.dirname(__file__), 'frontend')
     # Run the Vue build command
-    subprocess.run(['npm', 'install'], cwd=frontend_dir, check=True)
-    subprocess.run(['npm', 'run', 'build'], cwd=frontend_dir, check=True)
+    npm_cmd = resolve_npm()
+    subprocess.run([npm_cmd, 'install'], cwd=frontend_dir, check=True)
+    subprocess.run([npm_cmd, 'run', 'build'], cwd=frontend_dir, check=True)
     # Move the build output to the static directory
     build_output_dir = os.path.join(frontend_dir, 'dist')
     static_dir = os.path.join(os.path.dirname(__file__), 'wifigaze', 'static')
