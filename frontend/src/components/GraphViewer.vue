@@ -36,6 +36,34 @@
       <div id="export-panel">
         <button @click="exportGraph()">Export Graph</button>
       </div>
+
+      <div id="alert-panel">
+        <h3>Alerts</h3>
+        <div v-if="alerts.length === 0" class="alert-empty">No alerts detected</div>
+        <ul v-else class="alert-list">
+          <li
+            v-for="alert in alerts"
+            :key="alert.id"
+            class="alert-item"
+            @mouseenter="handleAlertEnter(alert)"
+            @mouseleave="handleAlertLeave"
+          >
+            <div class="alert-header">
+              <span class="alert-type">{{ alert.type }}</span>
+              <span class="alert-severity" :class="`severity-${alert.severity}`">{{ alert.severity }}</span>
+            </div>
+            <div class="alert-time">{{ formatAlertTime(alert.time) }}</div>
+            <div class="alert-description">{{ alert.description }}</div>
+            <div class="alert-meta">
+              <span v-if="alert.source">Src: {{ alert.source }}</span>
+              <span v-if="alert.target">Dst: {{ alert.target }}</span>
+              <span v-if="alert.bssid">BSSID: {{ alert.bssid }}</span>
+              <span v-if="alert.ssid">SSID: {{ alert.ssid }}</span>
+              <span v-if="alert.count">Count: {{ alert.count }} / {{ Math.round(alert.windowMs / 1000) }}s</span>
+            </div>
+          </li>
+        </ul>
+      </div>
       
       <div
           class="resizer resizer-right"
@@ -81,7 +109,8 @@ export default {
     let sigmaInstance = null;
     let graph = new Graph();
     const attributes = ref([]);
-    const filteredNodes = ref([]);
+  const filteredNodes = ref([]);
+  const alerts = ref([]);
     let socket = null;
     const infopanel = ref(null);
     let ssids = ref({});
@@ -224,7 +253,7 @@ export default {
 
     const handleWebSocketMessage = (event) => {
       try {
-        processMessage(graph, event, ssids.value, ssidColours);
+  processMessage(graph, event, ssids.value, ssidColours, alerts);
         packetCounter++;
         scaleNodes();
         //populateLegend();
@@ -271,6 +300,7 @@ export default {
 
     // Helper function to highlight connected nodes and edges
     function highlightNode(nodeKey) {
+      if (!graph.hasNode(nodeKey)) return;
       sigmaInstance.setSetting('nodeReducer', (node, data) => {
         if (node === nodeKey || graph.neighbors(nodeKey).includes(node)) {
           return { ...data, color: data.color, labelColor: '#000000' };
@@ -293,6 +323,29 @@ export default {
       sigmaInstance.setSetting('edgeReducer', edgeReducer);
       sigmaInstance.refresh();
     }    
+
+    const resolveAlertNode = (alert) => {
+      const candidates = [alert.transmitter, alert.source, alert.target, alert.receiver];
+      for (const candidate of candidates) {
+        if (candidate && graph.hasNode(candidate)) {
+          return candidate;
+        }
+      }
+      return null;
+    };
+
+    const handleAlertEnter = (alert) => {
+      const nodeKey = resolveAlertNode(alert);
+      if (!nodeKey) return;
+
+      highlightNode(nodeKey);
+      attributes.value = graph.getNodeAttributes(nodeKey);
+      attributes.value['connections'] = graph.neighbors(nodeKey);
+    };
+
+    const handleAlertLeave = () => {
+      resetHighlight();
+    };
 
     onMounted(() => {
       graphPreload();
@@ -433,6 +486,14 @@ export default {
       sigmaInstance.refresh();
     }
 
+    const formatAlertTime = (time) => {
+      try {
+        return new Date(time).toLocaleString();
+      } catch (error) {
+        return time;
+      }
+    };
+
     return { container, 
       infopanel,
       exportGraph, 
@@ -440,8 +501,11 @@ export default {
       ssids, 
       ssidColours, 
       filteredNodes, 
+      alerts,
       updateSearch, 
-      highlightNode,
+  highlightNode,
+  handleAlertEnter,
+  handleAlertLeave,
       gotoNode,
       leftPanelWidth,
       rightPanelWidth,
@@ -455,7 +519,9 @@ export default {
       websocketStatus,
       websocketStatusClass,
       packetCount,
-      reconnectWebSocket };
+      reconnectWebSocket,
+  formatAlertTime,
+  resetHighlight };
   },
 };
 </script>
@@ -610,5 +676,88 @@ export default {
 
   button:hover {
     background-color: #0056b3;
+  }
+
+  #alert-panel {
+    margin-top: 20px;
+  }
+
+  #alert-panel h3 {
+    margin-bottom: 10px;
+  }
+
+  .alert-empty {
+    font-style: italic;
+    color: #666;
+  }
+
+  .alert-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .alert-item {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #fff8f6;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+  }
+
+  .alert-type {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .alert-severity {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+  }
+
+  .severity-high {
+    background-color: #dc3545;
+    color: #fff;
+  }
+
+  .severity-medium {
+    background-color: #ffc107;
+    color: #000;
+  }
+
+  .severity-low {
+    background-color: #17a2b8;
+    color: #fff;
+  }
+
+  .alert-time {
+    font-size: 0.85rem;
+    color: #555;
+  }
+
+  .alert-description {
+    font-size: 0.9rem;
+  }
+
+  .alert-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: #444;
   }
 </style>
