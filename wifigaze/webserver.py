@@ -1,12 +1,17 @@
 import asyncio
 import os
 import json
+from asyncio import QueueEmpty
 
 from quart import Quart, websocket, send_from_directory, send_file, Response
 from loguru import logger
 
 from .tshark import start_tshark, replay_pcap
 from .hopchannels import hop_channels
+
+QUEUE_MAXSIZE = 20000
+BATCH_MAX_ITEMS = 200
+BATCH_MAX_LATENCY_SECONDS = 0.02
 
 # Create Quart app
 app = Quart(__name__, static_folder='static')
@@ -81,12 +86,12 @@ async def startup():
     app.replay_task_started = False
 
     if app.pcap_file:
-        app.queue = asyncio.Queue(maxsize=100)
+        app.queue = asyncio.Queue(maxsize=QUEUE_MAXSIZE)
         app.add_background_task(broadcast)
         capture_started = True
     elif not app.no_monitormode:
         # Create a queue for broadcasting data
-        app.queue = asyncio.Queue(maxsize=100)
+        app.queue = asyncio.Queue(maxsize=QUEUE_MAXSIZE)
 
         # Start tshark processes for all interfaces
         for interface in app.interfaces:
@@ -105,15 +110,40 @@ async def startup():
         logger.info("webserver: Started without capture source")
 
 async def broadcast():
+    loop = asyncio.get_running_loop()
     while True:
-        items = []
-        items.append(await app.queue.get())
-        # Read data from the queue up to 10 items at a time
-        while not app.queue.empty() and len(items) < 10:
-            items.append(await app.queue.get())
-        # Broadcast the data to all connected clients
-        for client in connected_clients:
-            await client.send(json.dumps(items))
+        batch = [await app.queue.get()]
+        deadline = loop.time() + BATCH_MAX_LATENCY_SECONDS
+
+        while len(batch) < BATCH_MAX_ITEMS:
+            try:
+                batch.append(app.queue.get_nowait())
+                continue
+            except QueueEmpty:
+                pass
+
+            timeout = deadline - loop.time()
+            if timeout <= 0:
+                break
+
+            try:
+                batch.append(await asyncio.wait_for(app.queue.get(), timeout=timeout))
+            except asyncio.TimeoutError:
+                break
+
+        payload = json.dumps(batch, separators=(',', ':'))
+
+        if not connected_clients:
+            continue
+
+        clients_snapshot = tuple(connected_clients)
+        send_tasks = [client.send(payload) for client in clients_snapshot]
+        results = await asyncio.gather(*send_tasks, return_exceptions=True)
+
+        for client, result in zip(clients_snapshot, results):
+            if isinstance(result, Exception):
+                connected_clients.discard(client)
+                logger.debug(f"websocket: removed client after send failure: {result}")
 
 # Function for running Hypercorn
 async def run_quart(listen_ip, listen_port, interfaces, channels, channel_dwell_time, no_monitormode, graph_json, pcap_file):

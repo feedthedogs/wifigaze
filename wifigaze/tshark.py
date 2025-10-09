@@ -58,6 +58,7 @@ def capture_packets(interface, queue, main_loop):
         use_ek=True,
         custom_parameters=CAPTURE_FIELDS,
     )
+    capture.keep_packets = False
     logger.trace(f"running pyshark capture on interface: {interface}")
 
     try:
@@ -80,8 +81,10 @@ def capture_packets_from_pcap(pcap_path: str, queue, main_loop) -> None:
         display_filter='wlan',
         only_summaries=False,
         use_ek=True,
+        keep_packets=False,
         custom_parameters=CAPTURE_FIELDS,
     )
+    capture.keep_packets = False
     logger.info(f"replay: reading packets from {pcap_path}")
 
     try:
